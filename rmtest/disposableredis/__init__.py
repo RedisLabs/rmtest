@@ -20,9 +20,8 @@ def get_random_port():
         sock = socket.socket()
         try:
             sock.listen(port)
-        except Error:
+        except Exception:
             continue
-        #_, port = sock.getsockname()
         sock.close()
         return port
 
@@ -59,7 +58,7 @@ class DisposableRedis(object):
         self.use_aof = extra_args.pop('use_aof', False)
         self.extra_args = []
         for k, v in extra_args.items():
-            self.extra_args.append('--%s' % k)
+            self.extra_args.append('--{}'.format(k))
             if isinstance(v, (list, tuple)):
                 self.extra_args += list(v)
             else:
@@ -72,23 +71,19 @@ class DisposableRedis(object):
         self.pollfile = None
         self.process = None
 
-    def force_start(self):
-        self._is_external = False
-
     def _get_output(self):
         if not self.process:
             return ''
         return '' if REDIS_SHOW_OUTPUT else self.process.stdout.read()
 
-    def _start_process(self):
+    def _start_process(self, *args):
         if self._is_external:
             return
 
         if REDIS_DEBUGGER:
             debugger = REDIS_DEBUGGER.split()
-            args = debugger + self.args
-        else:
-            args = self.args
+            args = debugger + args
+
         stdout = None if REDIS_SHOW_OUTPUT else subprocess.PIPE
         if REDIS_SHOW_OUTPUT:
             sys.stderr.write("Executing: {}".format(repr(args)))
@@ -128,21 +123,20 @@ class DisposableRedis(object):
             self.port = self._port
 
         if not self.dumpfile:
-            self.dumpfile = 'dump.%s.rdb' % self.port
+            self.dumpfile = 'dump.{}.rdb'.format(self.port)
         if not self.aoffile:
-            self.aoffile = 'appendonly.%s.aof' % self.port
+            self.aoffile = 'appendonly.{}.aof'.format(self.port)
 
-        self.args = [self.path,
-                     '--port', str(self.port),
-                     '--save', '',
-                     '--dbfilename', self.dumpfile]
+        args = [self.path,
+                '--port', str(self.port),
+                '--save', '',
+                '--dbfilename', self.dumpfile]
         if self.use_aof:
-            self.args += ['--appendonly', 'yes',
-                          '--appendfilename', self.aoffile]
+            args += ['--appendonly', 'yes',
+                     '--appendfilename', self.aoffile]
+        args += self.extra_args
 
-        self.args += self.extra_args
-
-        self._start_process()
+        self._start_process(*args)
 
     def _cleanup_files(self):
         for f in (self.aoffile, self.dumpfile):
