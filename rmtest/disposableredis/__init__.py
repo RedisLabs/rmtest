@@ -7,6 +7,7 @@ import os.path
 import sys
 import warnings
 import random
+import traceback
 
 REDIS_DEBUGGER = os.environ.get('REDIS_DEBUGGER', None)
 REDIS_SHOW_OUTPUT = int(os.environ.get(
@@ -14,7 +15,6 @@ REDIS_SHOW_OUTPUT = int(os.environ.get(
 
 
 def get_random_port():
-
     while True:
         port = random.randrange(1025, 10000)
         sock = socket.socket()
@@ -24,18 +24,6 @@ def get_random_port():
             continue
         sock.close()
         return port
-
-
-class Client(redis.StrictRedis):
-
-    def __init__(self, disposable_redis, port):
-        redis.StrictRedis.__init__(self, port=port)
-        self.dr = disposable_redis
-
-    def retry_with_rdb_reload(self):
-        yield 1
-        self.dr.dump_and_reload()
-        yield 2
 
 
 class DisposableRedis(object):
@@ -82,11 +70,13 @@ class DisposableRedis(object):
 
         if REDIS_DEBUGGER:
             debugger = REDIS_DEBUGGER.split()
-            args = debugger + args
+            args = debugger + list(args)
 
         stdout = None if REDIS_SHOW_OUTPUT else subprocess.PIPE
         if REDIS_SHOW_OUTPUT:
             sys.stderr.write("Executing: {}".format(repr(args)))
+        # print("Launching new process..")
+        # traceback.print_stack()
         self.process = subprocess.Popen(
             args,
             stdin=sys.stdin,
@@ -154,13 +144,12 @@ class DisposableRedis(object):
             self._cleanup_files()
 
     def __enter__(self):
-        self.start()
         return self.client()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.stop()
-        if exc_val or self.errored:
-            sys.stderr.write("Redis output: {}\n".format(self._get_output()))
+        pass
+        # if exc_val or self.errored:
+        #     sys.stderr.write("Redis output: {}\n".format(self._get_output()))
 
     def _wait_for_child(self):
         # Wait until file is available
@@ -200,4 +189,8 @@ class DisposableRedis(object):
         """
         :rtype: redis.StrictRedis
         """
-        return Client(self, self.port)
+        return redis.StrictRedis(port=self.port)
+
+    def reset(self):
+        conn = self.client()
+        conn.flushdb()

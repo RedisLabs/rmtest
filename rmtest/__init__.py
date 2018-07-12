@@ -18,53 +18,99 @@ class BaseModuleTestCase(unittest.TestCase):
     config.py file), or via the rmtest.config file in the current directoy (i.e.
     of the process, not the file), or via environment variables.
     """
+
+    # Class attributes which control how servers are created/destroyed
+
+    # Create a new process for each test.
+    process_per_test = False
+
+    # Class level server. Usually true if process_per_test is false
+    class_server = None
+
+    # Module-specific arguments
+    @classmethod
+    def get_module_args(cls):
+        return []
+
+    @classmethod
+    def get_server_args(cls):
+        return {}
+
     def tearDown(self):
-        if hasattr(self, '_server'):
+        cls = type(self)
+        if cls.class_server:
+            cls.class_server.reset()
+
+        elif hasattr(self, '_server'):
             self._server.stop()
-            self._server = None
-            self._client = None
+            del self._server
 
         super(BaseModuleTestCase, self).tearDown()
+
+    def setUp(self):
+        super(BaseModuleTestCase, self).setUp()
+        self._ensure_server()
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls.class_server:
+            cls.class_server.stop()
+            cls.class_server = None
+        super(BaseModuleTestCase, cls).tearDownClass()
+
+    @classmethod
+    def setup_class_server(cls):
+        cls.class_server = cls.create_server()
+        cls.class_server.start()
 
     @property
     def server(self):
         self._ensure_server()
         return self._server
 
+    def redis(self):
+        return self.server
+
     @property
     def client(self):
         self._ensure_server()
         return self._client
 
-    def spawn_server(self, **kwargs):
-        if hasattr(self, '_server'):
-            raise Exception('Server already spawned!')
-        self._ensure_server(**kwargs)
-
     def restart_and_reload(self):
         self._server.dump_and_reload(restart_process=True)
         self._client = self._server.client()
 
-    def _ensure_server(self, **kwargs):
+    def reloading_iterator(self):
+        """
+        You can use this function as a block under which to execute code while
+        the server is reloaded.
+        e.g.
+
+        for _ in self.reloading_iterator:
+            do_stuff
+        """
+        yield 1
+        self._server.dump_and_reload(restart_process=False)
+        yield 2
+
+    retry_with_reload = reloading_iterator
+    retry_with_rdb_reload = reloading_iterator
+
+    def _ensure_server(self):
         if getattr(self, '_server', None):
             return
-        self._server = self.redis(**kwargs)
+
+        if self.class_server:
+            self._server = self.class_server
+            self._client = self._server.client()
+            return
+
+        self._server = self.create_server()
         self._server.start()
         self._client = self._server.client()
 
-    @property
-    def module_args(self):
-        """
-        Module-specific arguments required
-        """
-        return []
-
-    @property
-    def server_args(self):
-        """
-        Server-specific arguments required
-        """
-        return {}
+        if not self.process_per_test:
+            type(self).class_server = self._server
 
     @property
     def is_external_server(self):
@@ -73,20 +119,40 @@ class BaseModuleTestCase(unittest.TestCase):
         """
         return config.REDIS_PORT
 
-    def redis(self, **redis_args):
+    @classmethod
+    def build_server_args(cls, **redis_args):
+        if not config.REDIS_MODULE:
+            raise Exception('No module specified. Use config file or environment!')
+        redis_args.update(cls.get_server_args())
+        redis_args.update(
+            {'loadmodule': [config.REDIS_MODULE] + cls.get_module_args()})
+        return redis_args
+
+    @classmethod
+    def create_server(cls, **redis_args):
         """
         Return a connection to a server, creating one or connecting to an
         existing server.
         """
-        if not config.REDIS_MODULE:
-            raise Exception('No module specified. Use config file or environment!')
-        redis_args.update(self.server_args)
-        redis_args.update(
-            {'loadmodule': [config.REDIS_MODULE] + self.module_args})
-        return DisposableRedis(port=config.REDIS_PORT, path=config.REDIS_BINARY, **redis_args)
+        return DisposableRedis(path=config.REDIS_BINARY, port=config.REDIS_PORT,
+                               **cls.build_server_args(**redis_args))
+
+    #  Redis comand set
 
     def cmd(self, *args, **kwargs):
         return self.client.execute_command(*args, **kwargs)
+
+    def execute_command(self, *args, **kwargs):
+        return self.cmd(*args, **kwargs)
+
+    def exists(self, *args):
+        return self.client.exists(*args)
+
+    def hmset(self, *args, **kwargs):
+        return self.client.hmset(*args, **kwargs)
+
+    def keys(self, *args, **kwargs):
+        return self.client.keys(*args, **kwargs)
 
     def assertOk(self, x, msg=None):
         if type(x) == type(b""):
@@ -102,9 +168,6 @@ class BaseModuleTestCase(unittest.TestCase):
 
     def assertNotExists(self, r, key, msg=None):
         self.assertFalse(r.exists(key), msg)
-
-    def retry_with_reload(self):
-        return self.client.retry_with_rdb_reload()
 
     @contextlib.contextmanager
     def assertResponseError(self, msg=None):
@@ -123,39 +186,3 @@ class BaseModuleTestCase(unittest.TestCase):
             pass
         else:
             self.fail("Expected redis ResponseError " + (msg or ''))
-
-
-def ModuleTestCase(module_path, redis_path='redis-server', module_args=None):
-    """
-    DEPRECATED. Use base class directly.
-
-    Inherit your test class from the class generated by calling this function
-    module_path is where your module.so resides, override it with REDIS_MODULE_PATH in env
-    redis_path is the executable's path, override it with REDIS_PATH in env
-    redis_port is an optional port for an already running redis
-    module_args is an optional tuple or list of arguments to pass to the module on loading
-    """
-
-    module_path = config.REDIS_MODULE if config.REDIS_MODULE else module_path
-    redis_path = config.REDIS_BINARY if config.REDIS_BINARY else redis_path
-    fixed_port = config.REDIS_PORT if config.REDIS_PORT else None
-    port = fixed_port if fixed_port else None
-
-    # If we have module args, create a list of arguments
-    loadmodule_args = module_path \
-        if not module_args else [module_path] + list(module_args)
-
-    class _ModuleTestCase(BaseModuleTestCase):
-        _loadmodule_args = loadmodule_args
-
-        @property
-        def module_args(self):
-            args = super(_ModuleTestCase, self).module_args
-            if module_args:
-                args += module_args
-
-        def redis(self, **kwargs):
-            return DisposableRedis(port=port, path=redis_path,
-                                   loadmodule=self._loadmodule_args, **kwargs)
-
-    return _ModuleTestCase

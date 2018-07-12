@@ -47,3 +47,15 @@ REDIS_MODULE = entries['module'].value
 REDIS_PORT = entries['port'].value
 if REDIS_PORT:
     REDIS_PORT = int(REDIS_PORT)
+
+IS_CLUSTER = False
+
+
+def get_param(name, default=None):
+    if name in os.environ:
+        return os.environ[name]
+
+    try:
+        return cfg.get('testvars', name)
+    except (NoOptionError, NoSectionError):
+        return default

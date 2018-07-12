@@ -1,13 +1,9 @@
 import unittest
 from disposableredis.cluster import Cluster
-from disposableredis import Client
 from redis import Redis, ConnectionPool, ResponseError
+from rmtest import config
 import os
 import contextlib
-
-REDIS_MODULE_PATH_ENVVAR = 'REDIS_MODULE_PATH'
-REDIS_PATH_ENVVAR = 'REDIS_PATH'
-REDIS_PORT_ENVVAR = 'REDIS_PORT'
 
 def ClusterModuleTestCase(module_path, num_nodes=3, redis_path='redis-server', fixed_port=None, module_args=tuple()):
     """
@@ -18,9 +14,10 @@ def ClusterModuleTestCase(module_path, num_nodes=3, redis_path='redis-server', f
     module_args is an optional tuple or list of arguments to pass to the module on loading
     """
 
-    module_path = os.getenv(REDIS_MODULE_PATH_ENVVAR, module_path)
-    redis_path = os.getenv(REDIS_PATH_ENVVAR, redis_path)
-    fixed_port = os.getenv(REDIS_PORT_ENVVAR, fixed_port)
+    module_path = config.REDIS_MODULE if config.REDIS_MODULE else module_path
+    redis_path = config.REDIS_BINARY if config.REDIS_BINARY else redis_path
+    fixed_port = config.REDIS_PORT if config.REDIS_PORT else None
+    port = fixed_port if fixed_port else None
 
     # If we have module args, create a list of arguments
     loadmodule_args = module_path if not module_args else [module_path] + list(module_args)
@@ -43,7 +40,6 @@ def ClusterModuleTestCase(module_path, num_nodes=3, redis_path='redis-server', f
             if cls._cluster:
                 cls._cluster.stop()
 
-        
         def client(self):
             return self._client
 
