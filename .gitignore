@@ -1,5 +1,9 @@
-*
-!/rmtest/**/
-!/rmtest
-!**/*.py
-!.gitignore
+*.pyc
+*.c
+*.o
+*.so
+dist/
+__pycache__
+.DS_Store
+*egg-info/
+.idea/
