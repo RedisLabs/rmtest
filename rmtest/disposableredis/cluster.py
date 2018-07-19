@@ -122,7 +122,17 @@ class Cluster(object):
         node = self._node_by_slot(slot)
 
         return node.client()
-    
+
+    def client(self):
+        return self.nodes[0].client()
+
+    def reset(self):
+        for n in self.nodes:
+            n.reset()
+
+    def dump_and_reload(self, **kwargs):
+        for n in self.nodes:
+            n.dump_and_reload(**kwargs)
 
 
 
