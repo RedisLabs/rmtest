@@ -3,11 +3,11 @@ from setuptools import setup, find_packages
 
 
 setup(
-    name='rmtest',
+    name='rmtest2',
     version='2.0.0',
 
     description='Redis Module Testing Utility',
-    url='http://github.com/RedisLabs/rmtest',
+    url='http://github.com/RedisLabs/rmtest2',
     packages=find_packages(),
     install_requires=['redis'],
     classifiers=[
