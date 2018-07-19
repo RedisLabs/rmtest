@@ -6,12 +6,8 @@ from redis import ResponseError
 from .disposableredis import DisposableRedis
 from . import config
 
-REDIS_MODULE_PATH_ENVVAR = 'REDIS_MODULE_PATH'
-REDIS_PATH_ENVVAR = 'REDIS_PATH'
-REDIS_PORT_ENVVAR = 'REDIS_PORT'
 
-
-class BaseModuleTestCase(unittest.TestCase):
+class _BaseModuleTestCase(unittest.TestCase):
     """
     You can inherit from this base class directly. The server, port, and module
     settings can be defined either directly via the config module (see the
@@ -45,10 +41,10 @@ class BaseModuleTestCase(unittest.TestCase):
             self._server.stop()
             del self._server
 
-        super(BaseModuleTestCase, self).tearDown()
+        super(_BaseModuleTestCase, self).tearDown()
 
     def setUp(self):
-        super(BaseModuleTestCase, self).setUp()
+        super(_BaseModuleTestCase, self).setUp()
         self._ensure_server()
 
     @classmethod
@@ -56,7 +52,7 @@ class BaseModuleTestCase(unittest.TestCase):
         if cls.class_server:
             cls.class_server.stop()
             cls.class_server = None
-        super(BaseModuleTestCase, cls).tearDownClass()
+        super(_BaseModuleTestCase, cls).tearDownClass()
 
     @classmethod
     def setup_class_server(cls):
@@ -182,7 +178,55 @@ class BaseModuleTestCase(unittest.TestCase):
 
         try:
             yield
-        except ResponseError:
+        except ResponseError as e:
+            if contained:
+                self.assertIn(contained, str(e))
             pass
         else:
             self.fail("Expected redis ResponseError " + (msg or ''))
+
+    def is_cluster(self):
+        return False
+
+
+def _gen_proxy_meth(name):
+    def fn(self, key, *args):
+        cli = self.server.client_for_key(key)
+        target = getattr(cli, name)
+        return target(key, *args)
+    return fn
+
+
+class ClusterTestCase(_BaseModuleTestCase):
+    @classmethod
+    def create_server(cls, **redis_args):
+        from disposableredis.cluster import Cluster
+        cl = Cluster(path=config.REDIS_BINARY, port=config.REDIS_PORT,
+                     **cls.build_server_args(**redis_args))
+        return cl
+
+    def broadcast(self, *args):
+        return self.server.broadcast(*args)
+
+    for name in ('exists', 'hmset', 'hset', 'hmget', 'exists'):
+        locals().update({name: _gen_proxy_meth(name)})
+
+    def keys(self, pattern):
+        s = set()
+        for rets in self.broadcast('keys', pattern):
+            [s.add(x) for x in rets]
+        return s
+
+    def is_cluster(self):
+        return True
+
+
+BaseModuleTestCase = _BaseModuleTestCase
+
+
+def set_cluster_mode():
+    """
+    Needs to be run before any other tests are imported!
+    """
+    global BaseModuleTestCase
+    BaseModuleTestCase = ClusterTestCase
