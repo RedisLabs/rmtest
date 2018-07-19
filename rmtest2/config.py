@@ -23,7 +23,7 @@ class ConfigVar(object):
 
 
 cfg = ConfigParser()
-cfg.read(['rmtest2.config'])
+cfg.read(['rmtest.config', 'rmtest2.config'])
 
 entries = {
     'path': ConfigVar('REDIS_PATH', 'executable', 'redis-server'),
