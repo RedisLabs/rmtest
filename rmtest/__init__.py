@@ -108,8 +108,8 @@ class _BaseModuleTestCase(unittest.TestCase):
         if not self.process_per_test:
             type(self).class_server = self._server
 
-    @property
-    def is_external_server(self):
+    @classmethod
+    def is_external_server(cls):
         """
         :return: True if the connected-to server is already launched
         """
