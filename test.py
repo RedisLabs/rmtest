@@ -1,10 +1,8 @@
 from subprocess import Popen
 import unittest
 import os.path
-import time
-from rmtest import ModuleTestCase
-from rmtest.cluster import ClusterModuleTestCase
-from rmtest.disposableredis import cluster
+import rmtest2.config
+from rmtest2 import BaseModuleTestCase, ClusterTestCase
 
 
 MODULE_PATH = os.path.abspath(os.path.dirname(__file__)) + '/' + 'module.so'
@@ -18,7 +16,14 @@ def build_module():
         raise Exception('Failed to compile module')
 
 
-class TestTestCase(ModuleTestCase(MODULE_PATH, module_args=('foo','bar'))):
+rmtest2.config.REDIS_MODULE = MODULE_PATH
+
+
+class TestTestCase(BaseModuleTestCase):
+    @classmethod
+    def get_module_args(cls):
+        return ['foo', 'bar']
+
     @classmethod
     def setUpClass(cls):
         super(TestTestCase, cls).setUpClass()
@@ -26,22 +31,21 @@ class TestTestCase(ModuleTestCase(MODULE_PATH, module_args=('foo','bar'))):
         if not os.path.exists(MODULE_PATH):
             build_module()
 
-    def testContext(self):
-        with self.redis() as r:
-            with self.redis() as r:
-                for _ in r.retry_with_rdb_reload():
-                    self.assertOk(r.execute_command('TEST.TEST'))
-                    with self.assertResponseError():
-                        r.execute_command('TEST.ERR')
-
     def testBasic(self):
-        self.assertTrue(self.server)
-        self.assertTrue(self.client)
         with self.assertResponseError():
             self.cmd('TEST.ERR')
 
+        for _ in self.reloading_iterator():
+            with self.assertResponseError():
+                self.cmd('TEST.ERR')
+            self.assertCmdOk('TEST.TEST')
 
-class ClusterTestCase(unittest.TestCase):
+
+class ClusterTestCase(ClusterTestCase):
+    @classmethod
+    def get_module_args(cls):
+        return ['foo', 'bar']
+
     @classmethod
     def setUpClass(cls):
         super(ClusterTestCase, cls).setUpClass()
@@ -49,35 +53,24 @@ class ClusterTestCase(unittest.TestCase):
         if not os.path.exists(MODULE_PATH):
             build_module()
 
-    def setUp(self):
-        self.cl = cluster.Cluster(num_nodes=3)
-
     def testCluster(self):
-        ports = self.cl.start()
-
+        ports = self.get_cluster_ports()
         self.assertEqual(3, len(ports))
 
-        res = self.cl.broadcast('ping')
+        res = self.broadcast('ping')
         self.assertListEqual(['PONG', 'PONG', 'PONG'], res)
-    
-    def tearDown(self):
-        self.cl.stop()
-        
-class ClusterTestCaseWithModule(ClusterModuleTestCase(MODULE_PATH, num_nodes=5, module_args=('foo','bar'))):
 
-    def testCluster(self):
+    def testModuleOnCluster(self):
+        for _ in self.reloading_iterator():
+            self.assertCmdOk('TEST.TEST')
+            self.cmd('TEST.TEST')
+            self.execute_command('TEST.TEST')
 
-        client = self.client()
-        self.assertIsNotNone(client)
-
-        for _ in self.retry_with_rdb_reload():
-            self.assertOk(client.execute_command('TEST.TEST'))
-            self.assertOk(self.cmd('TEST.TEST'))
-
-            node = self.client_for_key("foobar")
-            self.assertIsNotNone(node)
+            client = self.client_for_key("foobar")
+            self.assertIsNotNone(client)
             with self.assertResponseError():
                 client.execute_command('TEST.ERR')
+
 
 if __name__ == '__main__':
     unittest.main()
