@@ -166,7 +166,7 @@ class _BaseModuleTestCase(unittest.TestCase):
         self.assertFalse(r.exists(key), msg)
 
     @contextlib.contextmanager
-    def assertResponseError(self, msg=None):
+    def assertResponseError(self, msg=None, contained=None):
         """
         Assert that a context block with a redis command triggers a redis error response.
 
