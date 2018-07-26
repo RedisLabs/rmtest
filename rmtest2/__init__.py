@@ -18,7 +18,7 @@ class _BaseModuleTestCase(unittest.TestCase):
     # Class attributes which control how servers are created/destroyed
 
     # Create a new process for each test.
-    process_per_test = False
+    process_per_test = None
 
     # Class level server. Usually true if process_per_test is false
     class_server = None
@@ -105,7 +105,7 @@ class _BaseModuleTestCase(unittest.TestCase):
         self._server.start()
         self._client = self._server.client()
 
-        if not self.process_per_test:
+        if not (self.process_per_test or config.PROCESS_PER_TEST):
             type(self).class_server = self._server
 
     @classmethod

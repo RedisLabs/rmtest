@@ -23,12 +23,13 @@ class ConfigVar(object):
 
 
 cfg = ConfigParser()
-cfg.read(['rmtest.config', 'rmtest2.config'])
+cfg.read(['rmtest.config', 'rmtest2.config', 'rmtest.config.default'])
 
 entries = {
     'path': ConfigVar('REDIS_PATH', 'executable', 'redis-server'),
     'module': ConfigVar('REDIS_MODULE_PATH', 'module'),
-    'port': ConfigVar('REDIS_PORT', 'existing_port')
+    'port': ConfigVar('REDIS_PORT', 'existing_port'),
+    'process_per_test': ConfigVar('REDIS_PROCESS_PER_TEST', 'process_per_test')
 }
 
 for _, ent in entries.items():
@@ -41,7 +42,7 @@ for _, ent in entries.items():
     if ent.env in os.environ:
         ent.value = os.environ[ent.env]
 
-
+PROCESS_PER_TEST = bool(entries['process_per_test'].value)
 REDIS_BINARY = entries['path'].value
 REDIS_MODULE = entries['module'].value
 REDIS_PORT = entries['port'].value
