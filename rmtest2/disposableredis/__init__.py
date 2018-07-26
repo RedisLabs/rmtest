@@ -137,6 +137,7 @@ class DisposableRedis(object):
 
     def stop(self, for_restart=False):
         if self._is_external:
+            self.reset()
             return
 
         self.process.terminate()
@@ -185,4 +186,5 @@ class DisposableRedis(object):
 
     def reset(self):
         conn = self.client()
+        conn.flushall()
         conn.flushdb()

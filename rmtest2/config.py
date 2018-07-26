@@ -29,7 +29,10 @@ entries = {
     'path': ConfigVar('REDIS_PATH', 'executable', 'redis-server'),
     'module': ConfigVar('REDIS_MODULE_PATH', 'module'),
     'port': ConfigVar('REDIS_PORT', 'existing_port'),
-    'process_per_test': ConfigVar('REDIS_PROCESS_PER_TEST', 'process_per_test')
+    'process_per_test': ConfigVar('REDIS_PROCESS_PER_TEST', 'process_per_test'),
+    'is_cluster': ConfigVar('REDIS_IS_CLUSTER', 'is_cluster'),
+    'no_rdb_save': ConfigVar('REDIS_NO_RDBSAVE', 'no_rdb_save'),
+    'no_keys_cmd': ConfigVar('REDIS_NO_KEYS_CMD', 'no_keys_cmd'),
 }
 
 for _, ent in entries.items():
@@ -49,7 +52,9 @@ REDIS_PORT = entries['port'].value
 if REDIS_PORT:
     REDIS_PORT = int(REDIS_PORT)
 
-IS_CLUSTER = False
+IS_CLUSTER = entries['is_cluster'].value
+NO_RDBSAVE = entries['no_rdb_save'].value
+NO_KEYS_CMD = entries['no_keys_cmd'].value
 
 
 def get_param(name, default=None):

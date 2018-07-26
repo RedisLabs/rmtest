@@ -86,6 +86,9 @@ class _BaseModuleTestCase(unittest.TestCase):
             do_stuff
         """
         yield 1
+        if config.NO_RDBSAVE:
+            return
+
         self._server.dump_and_reload(restart_process=False)
         yield 2
 
@@ -186,7 +189,7 @@ class _BaseModuleTestCase(unittest.TestCase):
             self.fail("Expected redis ResponseError " + (msg or ''))
 
     def is_cluster(self):
-        return False
+        return config.IS_CLUSTER
 
 
 def _gen_proxy_meth(name):
@@ -225,6 +228,7 @@ class ClusterTestCase(_BaseModuleTestCase):
 
     def get_cluster_ports(self):
         return [x.port for x in self.server.nodes]
+
 
 BaseModuleTestCase = _BaseModuleTestCase
 
