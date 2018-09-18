@@ -1,5 +1,4 @@
-import os
-from ConfigParser import ConfigParser, NoOptionError, NoSectionError
+# pylint: disable=missing-docstring, invalid-name, too-few-public-methods
 
 """
 Configuration file for determining port, path, etc. of Redis. This is used
@@ -12,6 +11,12 @@ and REDIS_PORT which connects to an already-existent redis server.
 The `REDIS_PATH`, `REDIS_MODULE_PATH`, and `REDIS_PORT` environment variables
 can all be used to override these settings.
 """
+
+import os
+try:
+    from configparser import ConfigParser, NoOptionError, NoSectionError
+except ImportError:
+    from ConfigParser import ConfigParser, NoOptionError, NoSectionError
 
 
 class ConfigVar(object):

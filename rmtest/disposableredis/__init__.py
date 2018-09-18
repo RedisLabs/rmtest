@@ -1,12 +1,14 @@
+# pylint: disable=missing-docstring, invalid-name, broad-except, too-many-instance-attributes
+
 import subprocess
 import socket
-import redis
 import time
 import os
 import os.path
 import sys
 import warnings
 import random
+import redis
 
 REDIS_DEBUGGER = os.environ.get('REDIS_DEBUGGER', None)
 REDIS_SHOW_OUTPUT = int(os.environ.get(
@@ -20,7 +22,7 @@ def get_random_port():
         sock = socket.socket()
         try:
             sock.listen(port)
-        except Error:
+        except Exception:
             continue
         #_, port = sock.getsockname()
         sock.close()
@@ -30,7 +32,7 @@ def get_random_port():
 class Client(redis.StrictRedis):
 
     def __init__(self, disposable_redis, port):
-        redis.StrictRedis.__init__(self, port=port)
+        redis.StrictRedis.__init__(self, port=port, decode_responses=True)
         self.dr = disposable_redis
 
     def retry_with_rdb_reload(self):
@@ -57,6 +59,7 @@ class DisposableRedis(object):
         self.port = None
         self._is_external = True if port else False
         self.use_aof = extra_args.pop('use_aof', False)
+        self.args = []
         self.extra_args = []
         for k, v in extra_args.items():
             self.extra_args.append('--%s' % k)
@@ -156,6 +159,7 @@ class DisposableRedis(object):
             return
 
         self.process.terminate()
+        self.process.wait()
         if not for_restart:
             self._cleanup_files()
 
@@ -188,7 +192,6 @@ class DisposableRedis(object):
             if self._is_external:
                 warnings.warn('Tied to an external process. Cannot restart')
                 return
-            import time
             conn.bgrewriteaof()
             self._wait_for_child()
 
