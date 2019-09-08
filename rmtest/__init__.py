@@ -117,7 +117,7 @@ class BaseModuleTestCase(unittest.TestCase):
 
     def assertInitArgsSuccess(self):
         c, s = self.client, self.server
-        self.assertOk('OK', self.cmd('set', 'test', 'foo'))
+        self.assertOk('OK', self.cmd('PING'))
     
     def retry_with_reload(self):
         return self.client.retry_with_rdb_reload()
