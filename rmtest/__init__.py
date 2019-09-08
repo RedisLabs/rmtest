@@ -106,6 +106,19 @@ class BaseModuleTestCase(unittest.TestCase):
     def assertNotExists(self, r, key, msg=None):
         self.assertFalse(r.exists(key), msg)
 
+    def assertInitArgsFail(self):
+        try:
+            c, s = self.client, self.server
+        except Exception:
+            delattr(self, '_server')
+            self.assertOk('OK')
+        else:
+            self.assertOk('NotOK')  
+
+    def assertInitArgsSuccess(self):
+        c, s = self.client, self.server
+        self.assertEqual(True, self.cmd('PING'))
+    
     def retry_with_reload(self):
         return self.client.retry_with_rdb_reload()
 
